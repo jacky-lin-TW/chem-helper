@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>化學小幫手</title>
+</head>
+<body>
+  <h1>化學小幫手 🧪</h1>
+  <p>輸入化學式：</p>
+  <input id="formula" placeholder="例如 H2SO4">
+  <button onclick="calc()">計算</button>
+  <p id="result"></p>
+
+  <h2>公克 → 濃度</h2>
+  <input id="grams" placeholder="幾公克"> g，溶成
+  <input id="ml" placeholder="幾毫升"> mL
+  <button onclick="toMolarity()">計算濃度</button>
+  <p id="result2"></p>
+
+  <h2>配溶液要秤幾公克</h2>
+  想配 <input id="targetM" placeholder="幾 M"> M，
+  <input id="targetMl" placeholder="幾毫升"> mL
+  <button onclick="toGrams()">計算</button>
+  <p id="result3"></p>
+
+  <script>
+    // 原子量表：IUPAC CIAAW Abridged Standard Atomic Weights 2024
+    const atomicMass = {
+      "H": 1.008, "He": 4.0026, "Li": 6.94, "Be": 9.0122, "B": 10.81,
+      "C": 12.011, "N": 14.007, "O": 15.999, "F": 18.998, "Ne": 20.18,
+      "Na": 22.99, "Mg": 24.305, "Al": 26.982, "Si": 28.085, "P": 30.974,
+      "S": 32.06, "Cl": 35.45, "Ar": 39.95, "K": 39.098, "Ca": 40.078,
+      "Sc": 44.956, "Ti": 47.867, "V": 50.942, "Cr": 51.996, "Mn": 54.938,
+      "Fe": 55.845, "Co": 58.933, "Ni": 58.693, "Cu": 63.546, "Zn": 65.38,
+      "Ga": 69.723, "Ge": 72.63, "As": 74.922, "Se": 78.971, "Br": 79.904,
+      "Kr": 83.798, "Rb": 85.468, "Sr": 87.62, "Y": 88.906, "Zr": 91.222,
+      "Nb": 92.906, "Mo": 95.95, "Ru": 101.07, "Rh": 102.91, "Pd": 106.42,
+      "Ag": 107.87, "Cd": 112.41, "In": 114.82, "Sn": 118.71, "Sb": 121.76,
+      "Te": 127.6, "I": 126.9, "Xe": 131.29, "Cs": 132.91, "Ba": 137.33,
+      "La": 138.91, "Ce": 140.12, "Pr": 140.91, "Nd": 144.24, "Sm": 150.36,
+      "Eu": 151.96, "Gd": 157.25, "Tb": 158.93, "Dy": 162.5, "Ho": 164.93,
+      "Er": 167.26, "Tm": 168.93, "Yb": 173.05, "Lu": 174.97, "Hf": 178.49,
+      "Ta": 180.95, "W": 183.84, "Re": 186.21, "Os": 190.23, "Ir": 192.22,
+      "Pt": 195.08, "Au": 196.97, "Hg": 200.59, "Tl": 204.38, "Pb": 207.2,
+      "Bi": 208.98, "Th": 232.04, "Pa": 231.04, "U": 238.03,
+    };
+
+    let molarMass = 0;   // 算好的分子量存在這裡，給下面兩個功能用（0 代表還沒算）
+
+    function calc() {
+      let formula = document.getElementById("formula").value.trim();  // 拿到輸入框的字，trim() 去掉前後空白
+      let result = document.getElementById("result");                 // 找到放答案的地方
+
+      if (formula === "") {                       // 什麼都沒打
+        result.textContent = "請輸入化學式";
+        return;                                   // 直接結束，不往下算
+      }
+
+      // ===== 第 1 關：讀懂化學式（跟 Python 版一樣的邏輯）=====
+      let counts = {};
+      let symbol = "";
+      let number = "";
+
+      for (let ch of formula) {                   // 一個字一個字讀
+        if (ch >= "A" && ch <= "Z") {             // 大寫字母：新元素開始
+          if (symbol !== "") {
+            if (number === "") {
+              number = "1";
+            }
+            counts[symbol] = (counts[symbol] || 0) + parseInt(number);  // 加進字典（查不到當 0）
+          }
+          symbol = ch;
+          number = "";
+        } else if (ch >= "a" && ch <= "z") {      // 小寫字母：接在元素符號後面
+          symbol = symbol + ch;
+        } else if (ch >= "0" && ch <= "9") {      // 數字：接起來
+          number = number + ch;
+        }
+      }
+      if (number === "") {                        // 補存最後一個元素
+        number = "1";
+      }
+      counts[symbol] = (counts[symbol] || 0) + parseInt(number);
+
+      // ===== 第 2 關：算分子量 =====
+      let missing = [];
+      for (let s in counts) {                     // 檢查每個元素
+        if (!(s in atomicMass)) {                 // 原子量表裡沒有
+          missing.push(s);                        // push 就是 Python 的 append
+        }
+      }
+
+      if (missing.length > 0) {
+        molarMass = 0;                            // 算不出來，清空
+        result.textContent = "原子量表裡還沒有這些元素：" + missing.join("、");
+      } else {
+        let total = 0;
+        for (let s in counts) {
+          total = total + atomicMass[s] * counts[s];
+        }
+        molarMass = total;                        // 存起來，給濃度計算用
+        total = Math.round(total * 1000) / 1000;  // 四捨五入到小數第 3 位
+        result.textContent = formula + " 的分子量是 " + total + " g/mol";
+      }
+    }
+
+    // ===== 第 3 關：公克 → 莫耳 → 濃度 =====
+    function toMolarity() {
+      let result2 = document.getElementById("result2");
+      if (molarMass === 0) {                      // 還沒算分子量
+        result2.textContent = "請先在上面算出分子量";
+        return;
+      }
+      let grams = parseFloat(document.getElementById("grams").value);  // parseFloat 就是 Python 的 float()
+      let ml = parseFloat(document.getElementById("ml").value);
+      if (isNaN(grams) || isNaN(ml) || ml <= 0) {  // isNaN：不是數字；|| 是「或」
+        result2.textContent = "請輸入正確的數字";
+        return;
+      }
+      let moles = grams / molarMass;              // n = m ÷ M
+      let molarity = moles / (ml / 1000);         // C = n ÷ V
+      result2.textContent = "莫耳數 = " + Math.round(moles * 10000) / 10000 + " mol，濃度 = "
+                            + Math.round(molarity * 10000) / 10000 + " M";
+    }
+
+    // ===== 第 3 關：配溶液要秤幾公克 =====
+    function toGrams() {
+      let result3 = document.getElementById("result3");
+      if (molarMass === 0) {
+        result3.textContent = "請先在上面算出分子量";
+        return;
+      }
+      let targetM = parseFloat(document.getElementById("targetM").value);
+      let targetMl = parseFloat(document.getElementById("targetMl").value);
+      if (isNaN(targetM) || isNaN(targetMl)) {
+        result3.textContent = "請輸入正確的數字";
+        return;
+      }
+      let need = targetM * (targetMl / 1000) * molarMass;   // m = C × V × M
+      result3.textContent = "要秤 " + Math.round(need * 10000) / 10000 + " g";
+    }
+  </script>
+</body>
+</html>
